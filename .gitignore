@@ -2,6 +2,8 @@
 *.csv
 *.pem
 *.key
+devops-key
+devops-key.pub
 
 # Node
 node_modules/
