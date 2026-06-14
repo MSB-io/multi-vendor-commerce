@@ -3,8 +3,8 @@ pipeline {
     environment {
         AWS_REGION = 'ap-south-1'
         // TODO: Replace with your actual AWS Account ID
-        ECR_REPO_BACKEND = '<YOUR_ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/commerce-backend'
-        ECR_REPO_FRONTEND = '<YOUR_ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/commerce-frontend'
+        ECR_REPO_BACKEND = '040066346143.dkr.ecr.ap-south-1.amazonaws.com/commerce-backend'
+        ECR_REPO_FRONTEND = '040066346143.dkr.ecr.ap-south-1.amazonaws.com/commerce-frontend'
         CLUSTER_NAME = 'commerce-cluster'
     }
     stages {

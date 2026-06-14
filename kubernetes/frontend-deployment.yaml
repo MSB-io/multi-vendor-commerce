@@ -14,8 +14,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        # TODO: Replace <YOUR_ACCOUNT_ID> with actual Account ID
-        image: <YOUR_ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/commerce-frontend:latest
+        image: 040066346143.dkr.ecr.ap-south-1.amazonaws.com/commerce-frontend:latest
         ports:
         - containerPort: 80
         resources:

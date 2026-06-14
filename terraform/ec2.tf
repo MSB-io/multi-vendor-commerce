@@ -8,9 +8,14 @@ data "aws_ami" "amazon_linux_2023" {
   }
 }
 
+resource "aws_key_pair" "devops_key" {
+  key_name   = "devops-key"
+  public_key = file("../devops-key.pub")
+}
+
 resource "aws_instance" "jenkins" {
   ami           = data.aws_ami.amazon_linux_2023.id
-  instance_type = "t2.medium"
+  instance_type = "t3.micro"
   subnet_id     = module.vpc.public_subnets[0]
   vpc_security_group_ids = [aws_security_group.allow_all.id]
   key_name      = var.key_name
@@ -24,7 +29,7 @@ resource "aws_instance" "jenkins" {
 
 resource "aws_instance" "vault" {
   ami           = data.aws_ami.amazon_linux_2023.id
-  instance_type = "t2.micro"
+  instance_type = "t3.micro"
   subnet_id     = module.vpc.public_subnets[0]
   vpc_security_group_ids = [aws_security_group.allow_all.id]
   key_name      = var.key_name
