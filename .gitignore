@@ -1,0 +1,28 @@
+# AWS credentials - NEVER commit
+*.csv
+*.pem
+*.key
+
+# Node
+node_modules/
+.env
+.env.local
+
+# Build output
+dist/
+build/
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfvars
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
