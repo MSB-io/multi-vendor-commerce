@@ -1,0 +1,47 @@
+pipeline {
+    agent any
+    environment {
+        AWS_REGION = 'ap-south-1'
+        // TODO: Replace with your actual AWS Account ID
+        ECR_REPO_BACKEND = '<YOUR_ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/commerce-backend'
+        ECR_REPO_FRONTEND = '<YOUR_ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/commerce-frontend'
+        CLUSTER_NAME = 'commerce-cluster'
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/MSB-io/multi-vendor-commerce.git'
+            }
+        }
+        stage('Build & Push Backend') {
+            steps {
+                sh '''
+                    aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO_BACKEND
+                    docker build -t backend -f docker/Dockerfile.backend .
+                    docker tag backend $ECR_REPO_BACKEND:latest
+                    docker push $ECR_REPO_BACKEND:latest
+                '''
+            }
+        }
+        stage('Build & Push Frontend') {
+            steps {
+                sh '''
+                    aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO_FRONTEND
+                    docker build -t frontend -f docker/Dockerfile.frontend .
+                    docker tag frontend $ECR_REPO_FRONTEND:latest
+                    docker push $ECR_REPO_FRONTEND:latest
+                '''
+            }
+        }
+        stage('Deploy to EKS') {
+            steps {
+                sh '''
+                    aws eks update-kubeconfig --region $AWS_REGION --name $CLUSTER_NAME
+                    # Note: You must apply kubernetes/db-secret.yaml manually or via Vault before this works
+                    kubectl apply -f kubernetes/
+                    kubectl rollout restart deployment backend frontend || true
+                '''
+            }
+        }
+    }
+}
