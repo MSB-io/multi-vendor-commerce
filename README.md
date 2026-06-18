@@ -1,25 +1,81 @@
-# Multi-Vendor Commerce Platform - Final Documentation
+# Multi-Vendor Commerce Platform
 
-## Project Overview
-This project satisfies the requirements for **Case Study 5: Multi-Vendor Commerce Platform**. We built a cloud-native, microservices-based web application mimicking a vendor marketplace, and wrapped it in a complete, automated DevOps lifecycle using industry-standard tools within the constraints of the AWS Free Tier.
+This repository houses the code and DevOps assets for the Multi-Vendor Commerce Platform, showcasing a cloud-native microservices architecture backed by a fully automated CI/CD pipeline and cloud infrastructure on AWS.
 
-## Delivered Artifacts
-| Requirement | Implementation |
-|---|---|
-| **Working Application** | React JS frontend and Node.js/Express backend communicating via REST API. |
-| **Source Code Repository** | Hosted on GitHub (`MSB-io/multi-vendor-commerce`). |
-| **Dockerfiles & Images** | Multi-stage Dockerfiles. Images hosted securely on Amazon Elastic Container Registry (ECR). |
-| **Jenkins CI/CD** | Jenkinsfile defining a declarative pipeline for automated builds, testing, and Kubernetes deployment. |
-| **Terraform Scripts** | Infrastructure as Code (IaC) provisioning the VPC, subnets, EC2 instances, EKS cluster, and RDS database. |
-| **Kubernetes YAMLs** | Deployments, Services, ConfigMaps, and HPA (Horizontal Pod Autoscalers) ensuring high availability. |
-| **Monitoring** | Grafana dashboard provisioned to visualize CPU and Memory metrics for the EKS nodes and pods. |
-| **Logging** | ELK Stack (Elasticsearch & Kibana) deployed for centralized log aggregation. |
-| **Secret Management** | HashiCorp Vault implementation securely injecting database credentials without exposing them in plaintext. |
+---
 
-## Technical Highlights & Problem Solving
-During the deployment phase, we encountered strict AWS Free Tier constraints that required architectural pivots:
-1. **IP Address Exhaustion (ENI Limits)**: The `t3.micro` EC2 instances used for the EKS nodes hit their Elastic Network Interface IP limits, causing a scheduling deadlock during a rolling deployment. We resolved this by explicitly scaling the deployments to zero to free the IP pool before scaling back to the desired replica count.
-2. **EBS Storage Limits**: The ELK Stack Docker images exceeded the default 8GB root volume size of the EC2 instances. We dynamically resized the EBS volume to 20GB and performed a live filesystem expansion (`xfs_growfs`) to accommodate the containers without incurring out-of-pocket billing.
+## 📖 Complete Documentation Index
 
-## Conclusion
-This project successfully demonstrates the end-to-end automation of a software development lifecycle. By utilizing Terraform for infrastructure, Jenkins for CI/CD, Kubernetes for orchestration, and Vault for security, the Multi-Vendor Commerce platform is highly scalable, resilient, and production-ready.
+To explore the architecture, operations, and recovery procedures in detail, refer to the following documents:
+
+*   **[documentation.md](file:///Users/manthan/Desktop/Devops/documentation.md)**: Main, detailed guide covering subsystems (React frontend, Express backend, Postgres db schema), local development setup, CI/CD stages, Kubernetes config mapping, troubleshooting pivots, and a complete command reference.
+*   **[docs/ARCHITECTURE.md](file:///Users/manthan/Desktop/Devops/docs/ARCHITECTURE.md)**: High-level infrastructure diagram, user request routing flow, and structural component breakdown.
+*   **[docs/DEPLOYMENT.md](file:///Users/manthan/Desktop/Devops/docs/DEPLOYMENT.md)**: Step-by-step deployment guide with exact commands for local compose runs, Terraform provisioning, and EKS deployments.
+*   **[docs/DISASTER_RECOVERY.md](file:///Users/manthan/Desktop/Devops/docs/DISASTER_RECOVERY.md)**: Crisis runbook outlining recovery steps for database crashes, regional outages, Jenkins instance recovery, and pod load-spikes.
+
+---
+
+## 🚀 Quick Runbook Command Cheat Sheet
+
+### 1. Local Stack Orchestration (Docker Compose)
+Launch the application and its database locally:
+```bash
+# Start all application containers
+docker compose up -d --build
+
+# Run local monitoring stack (Elasticsearch, Kibana, Grafana)
+docker compose -f docker/docker-compose.monitoring.yml up -d
+
+# Tear down local stack and reset volumes
+docker compose down -v
+```
+
+### 2. Infrastructure Setup (Terraform)
+Provision the VPC, EKS Cluster, RDS instance, ECR registry, and EC2 instances:
+```bash
+cd terraform
+terraform init
+terraform plan -out=tfplan
+terraform apply -var="db_password=YourDatabaseSecretPassword123" -auto-approve
+```
+
+### 3. Deploying to AWS EKS
+Authenticate and apply Kubernetes manifests:
+```bash
+# Pull cluster authentication token
+aws eks update-kubeconfig --region ap-south-1 --name commerce-cluster
+
+# Deploy resources to EKS cluster
+kubectl apply -f kubernetes/
+
+# Roll out update pulls
+kubectl rollout restart deployment backend frontend
+```
+
+### 4. Resolving IP Exhaustion (AWS Free Tier EKS Worker Nodes)
+If rolling updates get stuck in `Pending` due to EKS IP address shortages:
+```bash
+# Terminate running pods to release ENI IP allocations
+kubectl scale deployment backend frontend --replicas=0
+
+# Verify pods are scaled down
+kubectl get pods
+
+# Scale back up to target replica count
+kubectl scale deployment backend frontend --replicas=2
+```
+
+---
+
+## 🛠 Delivered DevOps Artifacts
+
+| Requirement | Implementation Details | Link Reference |
+|---|---|---|
+| **Working Application** | React JS frontend & Node.js/Express API | [app/](file:///Users/manthan/Desktop/Devops/app) |
+| **Infrastructure as Code** | Terraform scripts for VPC, EKS, RDS, ECR, EC2 | [terraform/](file:///Users/manthan/Desktop/Devops/terraform) |
+| **Docker Images** | Multi-stage optimization builds | [docker/](file:///Users/manthan/Desktop/Devops/docker) |
+| **CI/CD Automation** | Declarative Jenkins Pipeline automation | [jenkins/Jenkinsfile](file:///Users/manthan/Desktop/Devops/jenkins/Jenkinsfile) |
+| **Kubernetes manifests** | Highly available setups with HPA scaling policies | [kubernetes/](file:///Users/manthan/Desktop/Devops/kubernetes) |
+| **Telemetry & Observability** | Centralized logging (ELK) & monitoring (Grafana) | [docker-compose.monitoring.yml](file:///Users/manthan/Desktop/Devops/docker/docker-compose.monitoring.yml) |
+| **Secret Management** | Vault integrations for database URL parameterization | [db-secret.yaml](file:///Users/manthan/Desktop/Devops/kubernetes/db-secret.yaml) |
+
