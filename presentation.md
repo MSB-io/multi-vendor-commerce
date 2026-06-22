@@ -10,33 +10,56 @@ The application is a modern microservices platform built with React, Node.js, an
 
 ```mermaid
 graph TD
-    subgraph "AWS Cloud (ap-south-1)"
-        subgraph "Public Subnet"
-            IGW[Internet Gateway]
-            Jenkins[Jenkins CI/CD Server<br>t3.micro]
-            ALB[Application Load Balancer]
-        end
-
-        subgraph "Private Subnet"
-            subgraph "EKS Cluster (commerce-cluster)"
-                Frontend[React Frontend Pods<br>Nginx]
-                Backend[Node.js Backend Pods<br>Express API]
+    subgraph AWS ["AWS Cloud (ap-south-1)"]
+        ECR["Amazon ECR (Docker Registry)"]
+        
+        subgraph VPC ["VPC (commerce-vpc: 10.0.0.0/16)"]
+            IGW["Internet Gateway (IGW)"]
+            NAT["NAT Gateway"]
+            
+            subgraph PublicSubnets ["Public Subnets (10.0.101.0/24, 10.0.102.0/24)"]
+                Jenkins["Jenkins CI/CD Server<br>(t3.micro)"]
+                Vault["Vault Server<br>(t3.micro)"]
+                ALB["Application Load Balancer (ALB)"]
             end
             
-            RDS[(Amazon RDS<br>PostgreSQL)]
+            subgraph PrivateSubnets ["Private Subnets (10.0.1.0/24, 10.0.2.0/24)"]
+                subgraph EKS ["EKS Cluster (commerce-cluster)"]
+                    Frontend["React Frontend Pods<br>(Nginx)"]
+                    Backend["Node.js Backend Pods<br>(Express)"]
+                end
+                RDS[("Amazon RDS PostgreSQL<br>(commerce-db)")]
+            end
         end
-        
-        ECR[Amazon ECR<br>Docker Registries]
     end
 
-    User((User/Browser)) --> |HTTP/HTTPS| ALB
-    ALB --> |Port 80| Frontend
-    Frontend --> |/api/| Backend
-    Backend --> |TCP 5432| RDS
+    User((User/Browser)) -->|HTTP/HTTPS (Port 80/443)| ALB
+    ALB -->|Forward to Target Group| Frontend
+    Frontend -->|API Requests| Backend
+    Backend -->|Database Queries (Port 5432)| RDS
     
-    Jenkins -.-> |Docker Push| ECR
-    Jenkins -.-> |kubectl apply| EKS
+    %% Outbound connections
+    EKS -->|Outbound traffic| NAT
+    NAT -->|Route to Internet| IGW
+    IGW -->|Internet| PublicWeb((Public Internet))
+    
+    %% CI/CD & Image Flow
+    Jenkins -->|Build & Push Images| ECR
+    Jenkins -->|Deploys Manifests| EKS
+    ECR -.->|Pull Images| EKS
+    
+    %% Styling
+    classDef aws fill:#232F3E,stroke:#232F3E,stroke-width:2px,color:#fff;
+    classDef vpc fill:#3B7F57,stroke:#3B7F57,stroke-width:2px,color:#fff;
+    classDef subnet fill:#1C3B57,stroke:#1C3B57,stroke-width:1px,color:#fff;
+    classDef resource fill:#FFFFFF,stroke:#232F3E,stroke-width:1px,color:#000;
+    
+    class AWS aws;
+    class VPC vpc;
+    class PublicSubnets,PrivateSubnets subnet;
+    class Jenkins,Vault,ALB,Frontend,Backend,RDS,ECR,IGW,NAT resource;
 ```
+
 
 ---
 
