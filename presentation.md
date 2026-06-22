@@ -61,6 +61,50 @@ graph TD
 ```
 
 
+### 🔍 Detailed Architecture Explanation
+
+This infrastructure implements a secure, highly-available, multi-tier cloud architecture designed to host containerized microservices. Below is a detailed breakdown of each architectural layer:
+
+#### 1. Network Topology (VPC & Subnetting)
+* **Virtual Private Cloud (VPC)**: Provisions an isolated virtual network (`10.0.0.0/16`) in the `ap-south-1` region.
+* **Public Subnets (`10.0.101.0/24`, `10.0.102.0/24`)**: 
+  - Placed in separate Availability Zones (`ap-south-1a` and `ap-south-1b`) for fault tolerance.
+  - Houses the **Internet Gateway (IGW)**, enabling inbound/outbound connectivity for public resources.
+  - Hosts the **Application Load Balancer (ALB)**, which acts as the entry point for user browser traffic.
+  - Hosts utility/management instances (**Jenkins CI/CD** and **HashiCorp Vault**) to allow direct administrative setup.
+  - Hosts the **NAT Gateway**, which allocates a public Elastic IP to enable secure, one-way outbound internet connectivity for resources in the private subnets.
+* **Private Subnets (`10.0.1.0/24`, `10.0.2.0/24`)**:
+  - Isolated from direct internet access to secure backend code and user data.
+  - Hosts the EKS Managed Node Groups and the Amazon RDS PostgreSQL Database.
+
+#### 2. Compute & Orchestration Layer (Amazon EKS)
+* **EKS Control Plane (`commerce-cluster`)**: Fully managed Kubernetes control plane that orchestrates container scheduling, deployments, scaling, and cluster state.
+* **EKS Managed Node Groups**: EC2 instances scaled across multiple AZs. 
+* **React Frontend Pods**: Packaged inside an Nginx server, responsible for serving static web assets and proxying requests starting with `/api/` directly to the backend service.
+* **Node.js Backend Pods**: Running Express API servers. They handle core business logic, authentication, and database access.
+* **Kubernetes Cluster IP Services**:
+  - `backend`: Internal service mapping traffic on port 5000 to backend pods.
+  - `frontend-service`: LoadBalancer type service that AWS provisions as an external ALB routing public traffic on port 80/443 to the frontend Nginx pods.
+
+#### 3. Database Layer (Amazon RDS PostgreSQL)
+* **Managed Database**: Houses user credentials, product catalog, and order data in a dedicated PostgreSQL database.
+* **VPC Isolation**: Located strictly in private subnets. It rejects all public internet connections, accepting TCP traffic on port `5432` only from EKS worker node security groups.
+* **Transit Encryption (SSL/TLS)**: Configured to require encrypted connection handshakes, preventing eavesdropping on data-in-transit.
+
+#### 4. Container Registry (Amazon ECR)
+* **Docker Registry**: Amazon ECR repositories securely host built Docker images for both `commerce-frontend` and `commerce-backend`.
+* **Deployment Workflow**: EKS nodes authenticate with ECR to pull these images whenever containers scale or rollout updates.
+
+#### 5. CI/CD & Image Building Pivot
+* **Jenkins Build Server**: Standardized automation pipeline engine. 
+* **Remote Multi-Stage Build Pivot**: To prevent local environment constraints (e.g., lack of local Docker resources), developers package source code as a lightweight `.tar.gz` (excluding heavy folders like `node_modules`), transfer it to the Jenkins EC2 instance, and trigger the remote multi-stage Docker compilation and ECR push pipeline there.
+
+#### 6. Security Architecture & Secrets Management
+* **HashiCorp Vault**: Provisioned as a standalone server to manage database credentials and JWT signing keys dynamically, eliminating the need to commit plain-text credentials in Kubernetes manifest repositories.
+* **VPC Subnet Security Trade-Off (Crucial Viva Point)**:
+  - *Current Design*: Jenkins and Vault reside in public subnets to facilitate direct UI/API setup and external testing.
+  - *Production Recommendation*: In a production deployment, both servers should reside in private subnets. Administrators would route access using an **AWS Client VPN** or **SSM Session Manager**, while internal EKS pods would access Vault using private endpoints.
+
 ---
 
 ## 🚀 2. Local Development (Testing before AWS)
