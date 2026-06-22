@@ -184,27 +184,35 @@ kubectl get svc frontend-service
 
 ---
 
-## 🚨 6. Critical Troubleshooting (The IP Exhaustion Deadlock)
+## 🚨 6. Critical Troubleshooting & Debugging
 
-**The Problem:**
-AWS Free Tier `t3.micro` EC2 instances have strict Elastic Network Interface (ENI) limits. They can only hold 4 IP addresses each. During a `kubectl rollout restart`, EKS tries to spin up *new* pods before deleting *old* ones. This instantly exhausts the available IPs on the node, causing new pods to hang indefinitely in a `Pending` state, which results in a `502 Bad Gateway` or `ERR_EMPTY_RESPONSE` at the Load Balancer.
+During the deployment, two critical real-world issues were encountered and resolved. These are excellent debugging case studies to present during a viva.
 
-**The Fix:**
-You must manually scale the deployments down to 0 to forcefully terminate the hung pods and release their IP addresses back into the VPC pool, before scaling them back up.
+### A. The IP Exhaustion Deadlock (AWS ENI Limit)
+* **The Problem**: AWS Free Tier `t3.micro` EC2 instances have strict Elastic Network Interface (ENI) limits. They can only hold 4 IP addresses each. Because EKS defaults to a rolling update (creating new pods before terminating old ones), a deployment or rollout restart instantly exhausts the available IPs. Pods then hang indefinitely in a `Pending` state, causing a `502 Bad Gateway` or `ERR_EMPTY_RESPONSE` at the Load Balancer.
+* **The Fix**: 
+  1. Set the Horizontal Pod Autoscaler (HPA) `minReplicas` to `1` (configured in `kubernetes/hpa.yaml`) to prevent auto-scaling from forcing 2 replicas.
+  2. Scale the deployments down to `0` to release all allocated node IPs.
+  3. Force-terminate any stubborn pods, and then scale back up to `1` replica.
 
 ```bash
-# 1. Scale down to 0
+# 1. Scale down to 0 to release all IPs
 kubectl scale deployment backend frontend --replicas=0
 
-# 2. Force delete any stubborn pods stuck in Terminating
+# 2. Force delete terminating pods to clear allocations immediately
 kubectl delete pods --all --grace-period=0 --force
 
-# 3. Verify namespace is empty (IPs are released)
+# 3. Verify namespace is clear
 kubectl get pods
 
-# 4. Scale back up to pull new images
-kubectl scale deployment backend frontend --replicas=2
+# 4. Scale back up to 1 replica (safe for t3.micro limits)
+kubectl scale deployment backend frontend --replicas=1
 ```
+
+### B. PostgreSQL SSL Connection Error (RDS Login Bug)
+* **The Problem**: Attempting to log in or query products returned a `500 Server Error`. The logs reported `no pg_hba.conf entry for host "...", user "postgres", database "commerce", no encryption`. AWS RDS PostgreSQL requires SSL-encrypted connections by default, but the backend Node.js pg client was running in a development mode without SSL enabled.
+* **The Fix**: Explicitly define `NODE_ENV: "production"` and `PORT: "5000"` in `kubernetes/backend-deployment.yaml`. This overrides any container `.env` configurations and forces the DB driver (`db.js`) to request a secure connection using `ssl: { rejectUnauthorized: false }`.
+
 
 ---
 
