@@ -33,10 +33,10 @@ graph TD
         end
     end
 
-    User((User/Browser)) -->|HTTP/HTTPS (Port 80/443)| ALB
+    User((User/Browser)) -->|"HTTP/HTTPS (Port 80/443)"| ALB
     ALB -->|Forward to Target Group| Frontend
     Frontend -->|API Requests| Backend
-    Backend -->|Database Queries (Port 5432)| RDS
+    Backend -->|"Database Queries (Port 5432)"| RDS
     
     %% Outbound connections
     EKS -->|Outbound traffic| NAT
